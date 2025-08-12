@@ -7,22 +7,22 @@ use App\Models\Device;
 use App\Models\DevicePricing;
 use App\Models\GamePricing;
 use App\Models\PlaySession;
-use App\Models\SessionPeriod; // تأكد من إضافة هذا السطر
+use App\Models\SessionPeriod;
+use App\Services\PricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Exception;
 
 class PlaySessionController extends Controller
 {
     public function start(Request $request)
     {
         $validated = $request->validate([
-            'device_id' => 'required|exists:devices,id',
+            'device_id' => ['required', 'exists:devices,id'],
             'play_type' => ['required', Rule::in(['time', 'game'])],
-            'time_type' => 'required_if:play_type,time|in:open,fixed',
-            'duration_in_minutes' => 'required_if:time_type,fixed|integer|min:15',
-            'controller_count' => 'required|integer|min:1',
-            'game_id' => 'required_if:play_type,game|exists:games,id',
+            'controller_count' => ['required', 'integer', 'min:1'],
+            'game_id' => ['required_if:play_type,game', 'exists:games,id'],
         ]);
 
         $device = Device::findOrFail($validated['device_id']);
@@ -30,47 +30,80 @@ class PlaySessionController extends Controller
             return back()->with('error', 'هذا الجهاز غير متاح حالياً!');
         }
 
-        DB::transaction(function () use ($validated, $device, $request) {
-            $startTime = now();
-            $expectedEndTime = null;
-            $totalCost = 0;
-            $duration = null;
-            
-            if ($validated['play_type'] === 'time' && $validated['time_type'] === 'fixed') {
-                $duration = $validated['duration_in_minutes'];
-                $expectedEndTime = $startTime->copy()->addMinutes($duration);
-                $pricing = DevicePricing::where('device_id', $device->id)
-                                        ->where('controller_count', $validated['controller_count'])
-                                        ->first();
-                if ($pricing) {
-                    $totalCost = ($duration / 60) * $pricing->price_per_hour;
-                }
-            }
+        if ($validated['play_type'] === 'game') {
+            $pricingService = new PricingService();
+            $pricing = $pricingService->findPricing(
+                $validated['play_type'],
+                $validated['controller_count'],
+                $device->id,
+                $validated['game_id'] ?? null
+            );
 
+            if (!$pricing) {
+                return back()->withInput()->with('error', 'خطأ: لم يتم تحديد سعر لهذه اللعبة.');
+            }
+        }
+
+        DB::transaction(function () use ($validated, $device, $request) {
             $playSession = PlaySession::create([
                 'device_id' => $device->id,
                 'user_id' => $request->user()->id,
-                'start_time' => $startTime,
-                'expected_end_time' => $expectedEndTime,
-                'total_cost' => $totalCost,
+                'session_start_at' => now(),
+                'total_cost' => 0,
                 'status' => 'active',
-                'duration_in_minutes' => $duration,
             ]);
 
-            $this->createInitialPeriod($playSession, $validated, $totalCost);
+            $this->createInitialPeriod($playSession, $validated);
             $device->update(['status' => 'busy']);
         });
-
+        
         return redirect()->route('employee.dashboard')->with('success', "تم بدء الجلسة للجهاز {$device->name} بنجاح.");
     }
+    
+    // ==================== بداية الدالة الجديدة ====================
+    public function addAnotherGame(PlaySession $playSession)
+    {
+        DB::transaction(function () use ($playSession) {
+            // 1. إنهاء الفترة الحالية (الجيم الحالي) وحساب تكلفتها
+            $this->endCurrentPeriod($playSession);
+
+            // 2. جلب تفاصيل الفترة الأخيرة التي تم إنهاؤها للتو
+            $lastPeriod = $playSession->periods()->latest('end_time')->first();
+
+            // 3. إنشاء فترة جديدة بنفس تفاصيل الفترة السابقة
+            if ($lastPeriod && $lastPeriod->play_type === 'game') {
+                $data = [
+                    'play_type' => 'game',
+                    'game_id' => $lastPeriod->game_id,
+                    'controller_count' => $lastPeriod->controller_count,
+                ];
+                $this->createInitialPeriod($playSession, $data);
+            }
+        });
+
+        return back()->with('success', 'تمت إضافة جيم جديد بنجاح.');
+    }
+    // ==================== نهاية الدالة الجديدة ====================
 
     public function switchPlayType(Request $request, PlaySession $playSession)
     {
         $validated = $request->validate([
             'play_type' => ['required', Rule::in(['time', 'game'])],
-            'controller_count' => 'required|integer|min:1',
-            'game_id' => 'required_if:play_type,game|exists:games,id',
+            'controller_count' => ['required', 'integer', 'min:1'],
+            'game_id' => ['required_if:play_type,game', 'exists:games,id'],
         ]);
+
+        $pricingService = new PricingService();
+        $pricing = $pricingService->findPricing(
+            $validated['play_type'],
+            $validated['controller_count'],
+            $playSession->device_id,
+            $validated['game_id'] ?? null
+        );
+
+        if (!$pricing) {
+            return back()->with('error', 'خطأ: لا يمكن التبديل، لم يتم تحديد سعر لهذا الخيار.');
+        }
 
         DB::transaction(function () use ($playSession, $validated) {
             $this->endCurrentPeriod($playSession);
@@ -93,7 +126,40 @@ class PlaySessionController extends Controller
             $playSession->device->update(['status' => 'available']);
         });
 
-        return redirect()->route('employee.dashboard')->with('success', 'تم إنهاء الجلسة بنجاح. التكلفة الإجمالية: ' . number_format($playSession->total_cost, 2));
+        return redirect()->route('employee.dashboard')->with('success', 'تم إنهاء الجلسة بنجاح. التكلفة الإجمالية: ' . number_format($playSession->total_cost, 2) . ' جنيه.');
+    }
+    
+    public function setAlert(Request $request, PlaySession $playSession)
+    {
+        $validated = $request->validate([
+            'alert_in_minutes' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if ($playSession->status !== 'active') {
+            return back()->with('error', 'لا يمكن ضبط منبه لجلسة منتهية.');
+        }
+
+        $minutes = $validated['alert_in_minutes'];
+        $alertTimestamp = now()->addMinutes((int)$minutes);
+
+        DB::table('play_sessions')
+            ->where('id', $playSession->id)
+            ->update(['alert_at' => $alertTimestamp]);
+        
+        return back()->with('success', "تم ضبط/تعديل المنبه بنجاح بعد {$minutes} دقيقة.");
+    }
+
+    public function cancelAlert(PlaySession $playSession)
+    {
+        if ($playSession->status !== 'active') {
+            return back()->with('error', 'لا يمكن إلغاء منبه لجلسة منتهية.');
+        }
+        
+        DB::table('play_sessions')
+            ->where('id', $playSession->id)
+            ->update(['alert_at' => null]);
+
+        return back()->with('success', 'تم إلغاء المنبه بنجاح.');
     }
 
     private function createInitialPeriod(PlaySession $playSession, array $data, float $initialCost = 0): void
@@ -102,8 +168,8 @@ class PlaySessionController extends Controller
         if ($data['play_type'] === 'game') {
             $pricing = GamePricing::where('game_id', $data['game_id'])
                                 ->where('controller_count', $data['controller_count'])
-                                ->first();
-            $cost = $pricing->price ?? 0;
+                                ->firstOrFail();
+            $cost = $pricing->price;
         }
 
         $playSession->periods()->create([
@@ -121,7 +187,7 @@ class PlaySessionController extends Controller
         if ($currentPeriod) {
             $endTime = now();
             $cost = $currentPeriod->cost;
-            if ($currentPeriod->play_type === 'time' && !$playSession->duration_in_minutes) {
+            if ($currentPeriod->play_type === 'time') { 
                 $pricing = DevicePricing::where('device_id', $playSession->device_id)
                                         ->where('controller_count', $currentPeriod->controller_count)
                                         ->first();

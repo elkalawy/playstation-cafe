@@ -13,10 +13,16 @@ class DashboardController extends Controller
      */
     public function index()
     {
-        // تم استخدام Eager Loading لتحميل العلاقات بكفاءة عالية في استعلام واحد
-        $devices = Device::with(['activeSession.user', 'activeSession.periods.game'])
-                         ->latest()
-                         ->get();
+        // تم استخدام Eager Loading لتحميل كل العلاقات المطلوبة بكفاءة عالية
+        $devices = Device::with([
+            'activeSession.user', 
+            'activeSession.periods.game',
+            'games',       
+            'pricings',
+            'games.pricings'
+        ])
+        ->latest()
+        ->get();
                          
         return view('employee.dashboard', compact('devices'));
     }

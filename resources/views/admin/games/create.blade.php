@@ -1,44 +1,69 @@
 <x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('إضافة لعبة جديدة') }}
+        </h2>
+    </x-slot>
+
     <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-lg sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    <h2 class="font-semibold text-xl text-gray-800 leading-tight mb-6">
-                        {{ __('إضافة لعبة جديدة') }}
-                    </h2>
-
-                    <form method="POST" action="{{ route('admin.games.store') }}" enctype="multipart/form-data">
+        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-8 bg-white border-b border-gray-200">
+                    <form action="{{ route('admin.games.store') }}" method="POST" enctype="multipart/form-data" x-data="imagePreview()">
                         @csrf
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-6">
+                                <div>
+                                    <label for="name" class="block text-sm font-medium text-gray-700">اسم اللعبة</label>
+                                    <input type="text" name="name" id="name" value="{{ old('name') }}" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label for="is_game_based_playable" class="block text-sm font-medium text-gray-700">نوع اللعب</label>
+                                    <select name="is_game_based_playable" id="is_game_based_playable" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="0">لعب بالوقت</option>
+                                        <option value="1">لعب بالجيم</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="cover_image" class="block text-sm font-medium text-gray-700">غلاف اللعبة</label>
+                                    <input type="file" name="cover_image" id="cover_image" @change="showPreview(event)" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                </div>
+                            </div>
 
-                        <div>
-                            <x-input-label for="name" :value="__('اسم اللعبة')" />
-                            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus />
-                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                            <div class="flex items-center justify-center">
+                                <div class="w-64 h-80 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                                    <template x-if="previewUrl === null">
+                                        <span>اختر صورة لعرضها هنا</span>
+                                    </template>
+                                    <template x-if="previewUrl !== null">
+                                        <img :src="previewUrl" alt="معاينة الصورة" class="w-full h-full object-cover rounded-lg">
+                                    </template>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="mt-4">
-                            <x-input-label for="is_game_based_playable" :value="__('هل تدعم اللعب بالجيم؟')" />
-                            <select name="is_game_based_playable" id="is_game_based_playable" class="block mt-1 w-full rounded-md shadow-sm border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                <option value="0">لا (لعب بالوقت فقط)</option>
-                                <option value="1">نعم (يمكن لعبها بالجيم)</option>
-                            </select>
-                            <x-input-error :messages="$errors->get('is_game_based_playable')" class="mt-2" />
-                        </div>
-                        
-                        <div class="mt-4">
-                            <x-input-label for="cover_image" :value="__('صورة الغلاف (اختياري)')" />
-                            <input id="cover_image" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" type="file" name="cover_image">
-                            <x-input-error :messages="$errors->get('cover_image')" class="mt-2" />
-                        </div>
-
-                        <div class="flex items-center justify-end mt-4">
-                            <x-primary-button>
-                                {{ __('حفظ اللعبة') }}
-                            </x-primary-button>
+                        <div class="mt-8 flex justify-start border-t pt-6">
+                            <a href="{{ route('admin.games.index') }}" class="px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50">إلغاء</a>
+                            <button type="submit" class="mr-3 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">حفظ اللعبة</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+    
+    <script>
+        function imagePreview() {
+            return {
+                previewUrl: null,
+                showPreview(event) {
+                    if (event.target.files.length > 0) {
+                        this.previewUrl = URL.createObjectURL(event.target.files[0]);
+                    } else {
+                        this.previewUrl = null;
+                    }
+                }
+            }
+        }
+    </script>
 </x-app-layout>

@@ -4,50 +4,54 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PlaySession extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    // ==================== بداية الجزء الذي تم تعديله ====================
     protected $fillable = [
         'device_id',
         'user_id',
-        'start_time',
+        'session_start_at',
+        'alert_at', // <-- تم حذف الأعمدة غير الضرورية
         'actual_end_time',
         'total_cost',
         'status',
     ];
+    // ==================== نهاية الجزء الذي تم تعديله ====================
 
     /**
      * The attributes that should be cast.
      *
      * @var array
      */
+    // ==================== بداية الجزء الذي تم تعديله ====================
     protected $casts = [
-        'start_time' => 'datetime',      // إضافة خاصية التحويل
-        'actual_end_time' => 'datetime', // إضافة خاصية التحويل
+        'session_start_at' => 'datetime',
+        'alert_at' => 'datetime', // <-- تم حذف الأعمدة غير الضرورية
+        'actual_end_time' => 'datetime',
     ];
+    // ==================== نهاية الجزء الذي تم تعديله ====================
 
-    /**
-     * Get the device that owns the session.
-     */
-    public function device()
+    public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class);
     }
 
-    /**
-     * Get the user (employee) who started the session.
-     */
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the periods for the play session.
-     */
-    public function periods()
+    public function periods(): HasMany
     {
         return $this->hasMany(SessionPeriod::class);
     }

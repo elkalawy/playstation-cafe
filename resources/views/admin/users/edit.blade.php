@@ -4,19 +4,14 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     <h2 class="font-semibold text-xl text-gray-800 leading-tight mb-6">
-                        {{ __('تعديل الجهاز: ') . $device->name }}
+                        {{ __('تعديل المستخدم: ') . $user->name }}
                     </h2>
-                    <form method="POST" action="{{ route('admin.devices.update', $device->id) }}">
+                    <form method="POST" action="{{ route('admin.users.update', $user) }}">
                         @csrf
                         @method('PATCH')
-                        
-                        {{-- استدعاء الفورم المشترك مع تمرير بيانات الجهاز --}}
-                        @include('admin.devices._form', ['device' => $device])
-                        
+                        @include('admin.users._form', ['user' => $user])
                         <div class="flex items-center justify-end mt-4">
-                            <x-primary-button>
-                                {{ __('حفظ التعديلات') }}
-                            </x-primary-button>
+                            <x-primary-button>{{ __('حفظ التعديلات') }}</x-primary-button>
                         </div>
                     </form>
                 </div>

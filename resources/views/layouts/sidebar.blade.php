@@ -15,15 +15,11 @@
             لوحة التحكم
         </a>
         
-        {{-- تم إضافة رابط الملف الشخصي هنا --}}
-        <a href="{{ route('profile.edit') }}" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 @if(request()->routeIs('profile.edit')) bg-gray-700 @endif">
-            الملف الشخصي
-        </a>
-
         {{-- روابط المدير فقط --}}
         @if(auth()->user()->role === 'admin')
-            <a href="{{ route('admin.users.create') }}" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 @if(request()->routeIs('admin.users.create')) bg-gray-700 @endif">
-                إضافة مستخدم
+            {{-- تم تعديل هذا الرابط --}}
+            <a href="{{ route('admin.users.index') }}" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 @if(request()->routeIs('admin.users.*')) bg-gray-700 @endif">
+                إدارة المستخدمين
             </a>
             <a href="{{ route('admin.devices.index') }}" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 @if(request()->routeIs('admin.devices.*')) bg-gray-700 @endif">
                 إدارة الأجهزة
@@ -37,6 +33,11 @@
         @if(auth()->user()->role === 'employee')
             {{--  --}}
         @endif
+
+        {{-- رابط الملف الشخصي --}}
+        <a href="{{ route('profile.edit') }}" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-gray-700 @if(request()->routeIs('profile.edit')) bg-gray-700 @endif">
+            الملف الشخصي
+        </a>
     </nav>
     
     <div>

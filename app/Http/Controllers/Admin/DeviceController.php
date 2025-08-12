@@ -11,7 +11,22 @@ class DeviceController extends Controller
 {
     public function index()
     {
-        $devices = Device::with('activeSession.user')->latest()->get();
+        // ==================== بداية الحل النهائي للسيطرة الكاملة ====================
+        $devices = Device::with([
+            'games', 
+            'pricings',
+            // نتحكم بشكل كامل في كيفية جلب الجلسة النشطة
+            'activeSession' => function ($query) {
+                // نطلب منه تحديد الأعمدة التي نريدها فقط من جدول الجلسات
+                $query->select('id', 'device_id', 'session_start_at', 'status');
+            },
+            'activeSession.user', 
+            'activeSession.periods'
+        ])
+        ->latest()
+        ->get();
+        // ==================== نهاية الحل النهائي للسيطرة الكاملة ====================
+                         
         return view('admin.devices.index', compact('devices'));
     }
 
@@ -26,8 +41,10 @@ class DeviceController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:255',
         ]);
+
         Device::create($validated);
-        return redirect()->route('admin.devices.index')->with('success', 'تمت إضافة الجهاز بنجاح!');
+
+        return redirect()->route('admin.devices.index')->with('success', 'تم إنشاء الجهاز بنجاح.');
     }
 
     public function edit(Device $device)
@@ -42,40 +59,28 @@ class DeviceController extends Controller
             'type' => 'required|string|max:255',
             'status' => 'required|string|in:available,busy,maintenance',
         ]);
+
         $device->update($validated);
-        return redirect()->route('admin.devices.index')->with('success', 'تم تعديل الجهاز بنجاح!');
+
+        return redirect()->route('admin.devices.index')->with('success', 'تم تحديث الجهاز بنجاح.');
     }
 
     public function destroy(Device $device)
     {
-        if ($device->activeSession) {
-            return back()->with('error', 'لا يمكن حذف جهاز لديه جلسة نشطة.');
-        }
         $device->delete();
-        return redirect()->route('admin.devices.index')->with('success', 'تم حذف الجهاز بنجاح!');
+        return redirect()->route('admin.devices.index')->with('success', 'تم حذف الجهاز بنجاح.');
     }
-
-    /**
-     * Show the form for managing games for a specific device.
-     * هذا هو الجزء الذي تم تعديله
-     */
+    
     public function manageGames(Device $device)
     {
         $games = Game::all();
-        // قمنا بحساب الألعاب المرتبطة هنا
-        $assignedGames = $device->games->pluck('id')->toArray();
-
-        // وقمنا بتمرير المتغير إلى الـ view هنا
-        return view('admin.devices.manage-games', compact('device', 'games', 'assignedGames'));
+        $deviceGames = $device->games->pluck('id')->toArray();
+        return view('admin.devices.manage-games', compact('device', 'games', 'deviceGames'));
     }
 
     public function syncGames(Request $request, Device $device)
     {
-        $request->validate([
-            'games' => 'nullable|array',
-            'games.*' => 'exists:games,id',
-        ]);
         $device->games()->sync($request->input('games', []));
-        return redirect()->route('admin.devices.index')->with('success', 'تم تحديث ألعاب الجهاز بنجاح!');
+        return redirect()->route('admin.devices.index')->with('success', 'تم تحديث ألعاب الجهاز بنجاح.');
     }
 }

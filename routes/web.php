@@ -3,15 +3,21 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
+// Admin Controllers
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
 use App\Http\Controllers\Admin\DevicePricingController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Admin\GamePricingController;
 use App\Http\Controllers\Admin\UserController;
+
+// Employee Controllers
 use App\Http\Controllers\Employee\DashboardController as EmployeeDashboardController;
 use App\Http\Controllers\Employee\PlaySessionController;
+
+// General Controllers
 use App\Http\Controllers\ProfileController;
+
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -31,21 +37,16 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-    Route::resource('users', UserController::class)->only(['create', 'store']);
+    Route::resource('users', UserController::class);
     Route::resource('devices', AdminDeviceController::class)->except(['show']);
     Route::resource('games', AdminGameController::class)->except(['show']);
-
     Route::get('devices/{device}/manage-games', [AdminDeviceController::class, 'manageGames'])->name('devices.manageGames');
     Route::post('devices/{device}/sync-games', [AdminDeviceController::class, 'syncGames'])->name('devices.syncGames');
-
     Route::get('devices/{device}/pricings', [DevicePricingController::class, 'index'])->name('devices.pricings.index');
     Route::post('devices/{device}/pricings', [DevicePricingController::class, 'store'])->name('devices.pricings.store');
-    // --- تم توحيد هذا المسار ---
     Route::delete('device-pricings/{pricing}', [DevicePricingController::class, 'destroy'])->name('devices.pricings.destroy');
-
     Route::get('games/{game}/pricings', [GamePricingController::class, 'index'])->name('games.pricings.index');
     Route::post('games/{game}/pricings', [GamePricingController::class, 'store'])->name('games.pricings.store');
-    // --- وتم توحيد هذا المسار ---
     Route::delete('game-pricings/{pricing}', [GamePricingController::class, 'destroy'])->name('games.pricings.destroy');
 });
 
@@ -54,6 +55,11 @@ Route::middleware(['auth', 'role:employee'])->prefix('employee')->name('employee
     Route::post('/play-sessions/start', [PlaySessionController::class, 'start'])->name('play_sessions.start');
     Route::post('/play-sessions/{playSession}/end', [PlaySessionController::class, 'end'])->name('play_sessions.end');
     Route::post('/play-sessions/{playSession}/switch', [PlaySessionController::class, 'switchPlayType'])->name('play_sessions.switch');
+    Route::post('/play-sessions/{playSession}/set-alert', [PlaySessionController::class, 'setAlert'])->name('play_sessions.set_alert');
+    Route::post('/play-sessions/{playSession}/cancel-alert', [PlaySessionController::class, 'cancelAlert'])->name('play_sessions.cancel_alert');
+    
+    // ==================== هذا هو المسار الجديد الذي تم إضافته ====================
+    Route::post('/play-sessions/{playSession}/add-game', [PlaySessionController::class, 'addAnotherGame'])->name('play_sessions.add_game');
 });
 
 require __DIR__.'/auth.php';
